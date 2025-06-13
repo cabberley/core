@@ -56,6 +56,7 @@ from homeassistant.util import dt as dt_util, slugify
 from homeassistant.util.enum import try_parse_enum
 
 from .const import (
+    ATTR_CRON_PATTERN,
     ATTR_NEXT_RESET,
     ATTR_VALUE,
     BIMONTHLY,
@@ -142,7 +143,7 @@ async def async_setup_entry(
 
     cron_pattern = None
     delta_values = config_entry.options[CONF_METER_DELTA_VALUES]
-    meter_offset = timedelta(days=config_entry.options[CONF_METER_OFFSET])
+    meter_offset = config_entry.options[CONF_METER_OFFSET] #timedelta(days=config_entry.options[CONF_METER_OFFSET])
     meter_type = config_entry.options[CONF_METER_TYPE]
     if meter_type == "none":
         meter_type = None
@@ -399,9 +400,9 @@ class UtilityMeterSensor(RestoreSensor):
         if meter_type is not None:
             # For backwards compatibility reasons we convert the period and offset into a cron pattern
             self._cron_pattern = PERIOD2CRON[meter_type].format(
-                minute=meter_offset.seconds % 3600 // 60,
-                hour=meter_offset.seconds // 3600,
-                day=meter_offset.days + 1,
+                minute=meter_offset["minutes"], #.seconds % 3600 // 60,
+                hour=meter_offset["hours"], #.seconds // 3600,
+                day=meter_offset["days"] #.days + 1,
             )
             _LOGGER.debug("CRON pattern: %s", self._cron_pattern)
         else:
@@ -720,6 +721,7 @@ class UtilityMeterSensor(RestoreSensor):
             ATTR_STATUS: PAUSED if self._collecting is None else COLLECTING,
             ATTR_LAST_PERIOD: str(self._last_period),
             ATTR_LAST_VALID_STATE: str(self._last_valid_state),
+            ATTR_CRON_PATTERN: str(self._cron_pattern),
         }
         if self._tariff is not None:
             state_attr[ATTR_TARIFF] = self._tariff
