@@ -43,6 +43,17 @@ from .const import (
     METER_TYPES,
     SERVICE_RESET,
     SIGNAL_RESET_METER,
+    EVERY_FIVE_MINUTES,
+    QUARTER_HOURLY,
+    HALF_HOURLY,
+    HOURLY,
+    DAILY,
+    WEEKLY,
+    MONTHLY,
+    BIMONTHLY,
+    QUARTERLY,
+    HALF_YEARLY,
+    YEARLY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,16 +86,6 @@ def period_or_cron(config):
     return config
 
 
-def max_28_days(config):
-    """Check that time period does not include more than 28 days."""
-    if config.days >= 28:
-        raise vol.Invalid(
-            "Unsupported offset of more than 28 days, please use a cron pattern."
-        )
-
-    return config
-
-
 METER_CONFIG_SCHEMA = vol.Schema(
     vol.All(
         {
@@ -93,7 +94,7 @@ METER_CONFIG_SCHEMA = vol.Schema(
             vol.Optional(CONF_UNIQUE_ID): cv.string,
             vol.Optional(CONF_METER_TYPE): vol.In(METER_TYPES),
             vol.Optional(CONF_METER_OFFSET, default=DEFAULT_OFFSET): vol.All(
-                cv.time_period, cv.positive_timedelta, max_28_days
+                cv.time_period, cv.positive_timedelta
             ),
             vol.Optional(CONF_METER_DELTA_VALUES, default=False): cv.boolean,
             vol.Optional(CONF_METER_NET_CONSUMPTION, default=False): cv.boolean,
@@ -288,10 +289,17 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     """Migrate old entry."""
     _LOGGER.debug("Migrating from version %s", config_entry.version)
 
-    if config_entry.version == 1:
+    if config_entry.version < 2:
         new = {**config_entry.options}
         new[CONF_METER_PERIODICALLY_RESETTING] = True
         hass.config_entries.async_update_entry(config_entry, options=new, version=2)
+    if config_entry.version < 3:
+        new = {**config_entry.options}
+        if isinstance(CONF_METER_OFFSET, int):
+            # Convert old int offset to timedelta
+            conf_days = new[CONF_METER_OFFSET]
+            new[CONF_METER_OFFSET] = {'hours': 0, 'minutes': 0, 'seconds': 0, 'days': conf_days}
+        hass.config_entries.async_update_entry(config_entry, options=new, version=3)
 
     _LOGGER.info("Migration to version %s successful", config_entry.version)
 
